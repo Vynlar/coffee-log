@@ -40,6 +40,7 @@
 
 (defn app-page [req & body]
   (let [{:keys [user]} req
+        current-nav-item (get-in req [:reitit.core/match :data :nav-item])
         {:user/keys [email]} user]
     (page
      {}
@@ -53,5 +54,9 @@
         [:button.text-blue-500.hover:text-blue-800 {:type "submit"}
          "Sign out"])
        "."]]
+
+     [:nav.space-x-3
+      [:a.link {:href "/app" :class (when (= :brews-page current-nav-item) "font-bold")} "Brews"]
+      [:a.link {:href "/beans" :class (when (= :beans-page current-nav-item) "font-bold")} "Beans"]]
 
      body)))

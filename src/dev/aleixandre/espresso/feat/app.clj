@@ -98,12 +98,12 @@
   (when error
     [:div.text-red-600.first-letter:capitalize (first error)]))
 
-(defn number-field [form {:keys [id name label right-element]}]
+(defn input-field [form {:keys [id name label right-element type]}]
   [:div.flex.flex-col.gap-2
    [:label.font-bold {:for id} label]
    [:div.flex.gap-4.items-center
     [:input {:id id
-             :name name :type "number"
+             :name name :type (or type "text")
              :step "any"
              :default-value (get-in form [:values (keyword name)])}]
     (when right-element
@@ -127,7 +127,7 @@
 (def default-brew-values {:values {:grind "" :dose "17" :yield "" :duration ""}})
 
 (defn- new-brew-form [{:keys [biff/db session]} form]
-  (let [all-beans (biff/q db '{:find [(pull ?beans [:xt/id :beans/name])]
+  (let [all-beans (biff/q db '{:find [(pull ?beans [*])]
                                :where [[?user :xt/id ?uid]
                                        [?beans :beans/user ?user]]
                                :in [?uid]}
@@ -137,32 +137,34 @@
       :hx-post "/brew"
       :hx-swap "outerHTML"}
 
-     (number-field form {:id "grind"
-                         :name "grind"
-                         :label "Grind"
-                         :right-element "grams"})
+     (input-field form {:id "grind"
+                        :type "number"
+                        :name "grind"
+                        :label "Grind"})
 
-     (number-field form {:id "dose"
-                         :name "dose"
-                         :label "Dose"
-                         :right-element "grams"})
+     (input-field form {:id "dose"
+                        :type "number"
+                        :name "dose"
+                        :label "Dose"
+                        :right-element "grams"})
 
-     (number-field form {:id "yield"
-                         :name "yield"
-                         :label "Yield"
-                         :right-element "grams"})
+     (input-field form {:id "yield"
+                        :type "number"
+                        :name "yield"
+                        :label "Yield"
+                        :right-element "grams"})
 
-     (number-field form {:id "duration"
-                         :name "duration"
-                         :label "Duration"
-                         :right-element "grams"})
+     (input-field form {:id "duration"
+                        :type "number"
+                        :name "duration"
+                        :label "Duration"
+                        :right-element "grams"})
 
      (select-field form {:id "beans"
                          :name "beans"
                          :label "Beans"
                          :options (mapv (fn [[beans]]
-                                          (biff/pprint beans)
-                                          {:value (:xt/id beans) :label (:beans/name beans)})
+                                          {:value (:xt/id beans) :label (str (:beans/name beans) " (" (:beans/roaster beans) ")")})
                                         all-beans)})
 
      [:button.btn
@@ -266,17 +268,117 @@
 
       {:status 404})))
 
-(defn new-brew-page [req]
+(defn beans-page [{:keys [biff/db session] :as req}]
+  (let [all-beans (biff/q db '{:find [(pull ?beans [*])]
+                               :where [[?user :xt/id ?uid]
+                                       [?beans :beans/user ?user]]
+                               :in [?uid]}
+                          (:uid session))]
+    (ui/app-page
+     req
+     [:div.flex.justify-between.items-center
+      [:h2.text-lg.font-bold "All Beans"]
+      [:a.inline-block.btn {:href "/beans/new"} "Add beans"]]
+     [:div#delete-response.text-red-500]
+     [:ul.p-0.m-0
+      (for [[{:keys [xt/id beans/name beans/roaster]}] all-beans]
+        [:li.flex.items-center name " (" roaster ")"
+         [:button {:hx-delete (str "/beans/" id)
+                   :hx-target "#delete-response"
+                   :hx-confirm "Are you sure?"} (icons/trash)]])])))
+
+(def default-beans-values {:values {:name "" :roaster ""}})
+
+(defn- new-beans-form [req form]
+  (biff/form {:hx-post "/beans"
+              :hx-swap "outerHTML"}
+             (input-field form {:id "name"
+                                :name "name"
+                                :label "Name"})
+             (input-field form {:id "roaster"
+                                :name "roaster"
+                                :label "Roaster"})
+
+             [:button.btn
+              {:type "submit"} "Save"]))
+
+(defn new-beans-page [{:keys [biff/db session] :as req}]
   (ui/app-page
    req
-   [:a.link {:href "/app"} "Back"]
-   (new-brew-form req default-brew-values)))
+   [:h2.text-lg.font-bold "New Beans"]
+
+   (new-beans-form req default-beans-values)))
+
+(defn new-brew-page [{:keys [biff/db session] :as req}]
+  (let [last-brew (first (mapv second (biff/q db '{:find [?brew-time (pull ?beans [*])]
+                                                   :where [[?beans :brew/user ?uid]
+                                                           [?beans :brew/brewed-at ?brew-time]]
+                                                   :order-by [[?brew-time :desc]]
+                                                   :limit 1
+                                                   :in [?uid]}
+                                              (:uid session))))
+        last-grind (when last-brew (:brew/grind last-brew))
+        last-beans (when last-brew (:brew/beans last-brew))]
+    (ui/app-page
+     req
+     [:a.link {:href "/app"} "Back"]
+     (new-brew-form req (-> default-brew-values
+                            (assoc-in [:values :grind] (or last-grind ""))
+                            (assoc-in [:values :beans] (or last-beans "")))))))
+
+(def create-beans-params [:map
+                          [:name :string]
+                          [:roaster :string]])
+
+(defn create-beans [{:keys [params session] :as req}]
+  (let [parsed (m/decode create-beans-params params mt/string-transformer)]
+    (if-not (m/validate create-beans-params parsed)
+      (biff/render (new-beans-form
+                    req
+                    {:values parsed
+                     :errors (me/humanize (m/explain create-beans-params parsed))}))
+      (do
+        (biff/submit-tx req
+                        [{:db/op :create
+                          :db/doc-type :beans
+                          :beans/name (:name parsed)
+                          :beans/roaster (:roaster parsed)
+                          :beans/roasted-on :db/now
+                          :beans/user (:uid session)}])
+
+        {:status 201
+         :headers {"HX-Redirect" "/beans"}}))))
+
+(defn delete-beans [{:keys [biff/db session path-params] :as req}]
+  (let [user-id (:uid session)
+        beans-id (parse-uuid (:id path-params))
+        beans (biff/q db '{:find [(pull ?beans [* {:brew/_beans [*]}])]
+                           :where [[?beans :xt/id ?beansid]
+                                   [?beans :beans/user ?uid]
+                                   (not-join [?beansid]
+                                             [?brew :brew/beans ?beansid])]
+                           :in [?uid ?bid]}
+                      user-id beans-id)]
+    (if (seq beans)
+      (do
+        (biff/submit-tx req
+                        [{:db/op :delete
+                          :db/doc-type :beans
+                          :xt/id beans-id}])
+
+        {:status 204
+         :headers {"HX-Refresh" "true"}})
+
+      [:span "Beans that are used in brews cannot be deleted"])))
 
 (def features
   {:routes ["" {:middleware [mid/wrap-signed-in]}
-            ["/app"
+            ["/app" {:nav-item :brews-page}
              ["" {:get app}]]
             ["/brew"
              ["" {:post create-brew}]
-             ["/new" {:get new-brew-page :conflicting true}]
-             ["/:id" {:delete delete-brew :conflicting true}]]]})
+             ["/new" {:get new-brew-page :conflicting true :nav-item :brews-page}]
+             ["/:id" {:delete delete-brew :conflicting true}]]
+            ["/beans" {:get beans-page :nav-item :beans-page :post create-beans}]
+            ["/beans/new" {:get new-beans-page :nav-item :beans-page :conflicting true}]
+            ["/beans/:id" {:delete delete-beans :conflicting true}]]})

@@ -32,11 +32,26 @@
 (defn page [opts & body]
   (base
    opts
-   [:.flex-grow]
    [:.p-3.mx-auto.max-w-screen-sm.w-full
     (when (bound? #'csrf/*anti-forgery-token*)
       {:hx-headers (cheshire/generate-string
                     {:x-csrf-token csrf/*anti-forgery-token*})})
-    body]
-   [:.flex-grow]
-   [:.flex-grow]))
+    body]))
+
+(defn app-page [req & body]
+  (let [{:keys [user]} req
+        {:user/keys [email]} user]
+    (page
+     {}
+     [:div.flex.items-baseline.justify-between.pb-6
+      [:h1.font-bold
+       settings/app-name]
+      [:div.text-sm "Signed in as " email ". "
+       (biff/form
+        {:action "/auth/signout"
+         :class "inline"}
+        [:button.text-blue-500.hover:text-blue-800 {:type "submit"}
+         "Sign out"])
+       "."]]
+
+     body)))

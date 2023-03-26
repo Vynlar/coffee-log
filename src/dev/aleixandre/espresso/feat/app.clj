@@ -175,6 +175,17 @@
 
      (form-save-button))))
 
+(def ^:private replace-contents-with-date
+  (str
+   "on load "
+   "set date to (my innerHTML as a Date) then "
+   "make an Intl.DateTimeFormat from 'en-US', {'dateStyle': 'short', 'timeStyle': 'short'} called formatter then "
+   "put formatter.format(date) into me then "
+   "remove .invisible"))
+
+(defn- ui-date-time [datetime]
+  [:span.invisible {:_ replace-contents-with-date} (biff/format-date datetime)])
+
 (defn app [{:keys [user] :as req}]
   (ui/app-page
    req
@@ -202,12 +213,12 @@
 
            [:div.flex.flex-col.items-center
             [:span.uppercase.text-xs.text-gray-500 "Ratio"]
-            "1:" (/ yield dose)]]]
+            "1:" (format "%.1f" (/ yield dose))]]]
 
          [:div.flex.gap-2.items-center
           [:div.flex.flex-col
            [:span.text-sm (:beans/name beans) " (" (:beans/roaster beans) ")"]
-           [:span.text-sm.text-gray-500 (biff/format-date brewed-at "MMM d yyyy h:mm a")]]
+           [:span.text-sm.text-gray-500 (ui-date-time brewed-at)]]
           [:button {:hx-delete (str "/brew/" id)
                     :hx-confirm "Are you sure?"} (icons/trash)]]]])]]))
 
@@ -284,9 +295,14 @@
       [:h2.text-lg.font-bold "My Beans"]
       [:a.inline-block.btn {:href "/beans/new"} "Add beans"]]
      [:div#delete-response.text-red-500]
-     [:ul.p-0.m-0
-      (for [[{:keys [xt/id beans/name beans/roaster]}] all-beans]
-        [:li.flex.items-center name " (" roaster ")"
+     [:ul.p-0.m-0.divide-y
+      (for [[{:keys [xt/id beans/name beans/roaster beans/roasted-on]}] all-beans]
+        [:li.flex.items-center.justify-between.max-w-sm.py-2
+         [:div.flex.flex-col
+          [:span.font-bold
+           name " (" roaster ")"]
+          [:span.text-sm.text-gray-500 "Roasted on "
+           (ui-date-time roasted-on)]]
          [:button {:hx-delete (str "/beans/" id)
                    :hx-target "#delete-response"
                    :hx-confirm "Are you sure?"} (icons/trash)]])])))

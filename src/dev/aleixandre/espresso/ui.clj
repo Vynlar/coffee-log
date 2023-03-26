@@ -55,7 +55,7 @@
          "Sign out"])
        "."]]
 
-     [:nav.space-x-3
+     [:nav.space-x-3.mb-6
       [:a.link {:href "/app" :class (when (= :brews-page current-nav-item) "font-bold")} "Brews"]
       [:a.link {:href "/beans" :class (when (= :beans-page current-nav-item) "font-bold")} "Beans"]]
 

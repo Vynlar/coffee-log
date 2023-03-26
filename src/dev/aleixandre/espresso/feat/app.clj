@@ -102,10 +102,10 @@
   [:div.flex.flex-col.gap-2
    [:label.font-bold {:for id} label]
    [:div.flex.gap-4.items-center
-    [:input {:id id
-             :name name :type (or type "text")
-             :step "any"
-             :default-value (get-in form [:values (keyword name)])}]
+    [:input.w-full {:id id
+                    :name name :type (or type "text")
+                    :step "any"
+                    :default-value (get-in form [:values (keyword name)])}]
     (when right-element
       [:span right-element])]
    (ui-error (get-in form [:errors (keyword name)]))])
@@ -126,6 +126,12 @@
 
 (def default-brew-values {:values {:grind "" :dose "17" :yield "" :duration ""}})
 
+(defn- form-save-button []
+  [:div.flex.gap-3.items-center.justify-end
+   [:a.link {:href "/app"} "Cancel"]
+   [:button.btn
+    {:type "submit"} "Save"]])
+
 (defn- new-brew-form [{:keys [biff/db session]} form]
   (let [all-beans (biff/q db '{:find [(pull ?beans [*])]
                                :where [[?user :xt/id ?uid]
@@ -133,7 +139,7 @@
                                :in [?uid]}
                           (:uid session))]
     (biff/form
-     {:class "space-y-4"
+     {:class "space-y-4 max-w-sm"
       :hx-post "/brew"
       :hx-swap "outerHTML"}
 
@@ -167,16 +173,15 @@
                                           {:value (:xt/id beans) :label (str (:beans/name beans) " (" (:beans/roaster beans) ")")})
                                         all-beans)})
 
-     [:button.btn
-      {:type "submit"} "Save"])))
+     (form-save-button))))
 
 (defn app [{:keys [user] :as req}]
   (ui/app-page
    req
 
    [:section.space-y-4
-    [:div.flex.justify-between.items-center
-     [:h2.text-lg.font-bold "Brews"]
+    [:div.flex.justify-between
+     [:h2.text-lg.font-bold "My Brews"]
      [:a.inline-block.btn {:href "/brew/new"} "New brew"]]
     [:ul.space-y-2.m-0.p-0
      (for [{:brew/keys [brewed-at dose yield duration beans] :xt/keys [id]} (reverse (sort-by :brew/brewed-at (:brew/_user user)))]
@@ -254,8 +259,7 @@
                            :where [[?brew :xt/id ?bid]
                                    [?brew :brew/user ?uid]]
                            :in [?uid ?bid]}
-                      user-id brew-id)
-        #_(biff/lookup db '[* {:brew/user [:xt/id]}] :xt/id brew-id)]
+                      user-id brew-id)]
     (if (seq brews)
       (do
         (biff/submit-tx req
@@ -276,8 +280,8 @@
                           (:uid session))]
     (ui/app-page
      req
-     [:div.flex.justify-between.items-center
-      [:h2.text-lg.font-bold "All Beans"]
+     [:div.flex.justify-between
+      [:h2.text-lg.font-bold "My Beans"]
       [:a.inline-block.btn {:href "/beans/new"} "Add beans"]]
      [:div#delete-response.text-red-500]
      [:ul.p-0.m-0
@@ -290,7 +294,8 @@
 (def default-beans-values {:values {:name "" :roaster ""}})
 
 (defn- new-beans-form [req form]
-  (biff/form {:hx-post "/beans"
+  (biff/form {:class "space-y-4 max-w-sm"
+              :hx-post "/beans"
               :hx-swap "outerHTML"}
              (input-field form {:id "name"
                                 :name "name"
@@ -299,8 +304,7 @@
                                 :name "roaster"
                                 :label "Roaster"})
 
-             [:button.btn
-              {:type "submit"} "Save"]))
+             (form-save-button)))
 
 (defn new-beans-page [{:keys [biff/db session] :as req}]
   (ui/app-page
@@ -321,7 +325,8 @@
         last-beans (when last-brew (:brew/beans last-brew))]
     (ui/app-page
      req
-     [:a.link {:href "/app"} "Back"]
+
+     [:h2.text-lg.font-bold "New Brew"]
      (new-brew-form req (-> default-brew-values
                             (assoc-in [:values :grind] (or last-grind ""))
                             (assoc-in [:values :beans] (or last-beans "")))))))

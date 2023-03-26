@@ -102,7 +102,7 @@
   [:div.flex.flex-col.gap-2
    [:label.font-bold {:for id} label]
    [:div.flex.gap-4.items-center
-    [:input {:id id :placeholder "e.g. 17"
+    [:input {:id id
              :name name :type "number"
              :step "any"
              :default-value (get-in form [:values (keyword name)])}]
@@ -110,31 +110,63 @@
       [:span right-element])]
    (ui-error (get-in form [:errors (keyword name)]))])
 
-(def default-brew-values {:values {:dose "17" :yield "" :duration ""}})
+(defn select-field [form {:keys [id name label right-element options]}]
+  [:div.flex.flex-col.gap-2
+   [:label.font-bold {:for id} label]
+   [:div.flex.gap-4.items-center
+    [:select {:id id
+              :class "w-full"
+              :name name :type "number"
+              :step "any"
+              :default-value (get-in form [:values (keyword name)])}
+     (for [{:keys [value label]} options] [:option {:value value} label])]
+    (when right-element
+      [:span right-element])]
+   (ui-error (get-in form [:errors (keyword name)]))])
 
-(defn- new-brew-form [form]
-  (biff/form
-   {:class "space-y-4"
-    :hx-post "/brew"
-    :hx-swap "outerHTML"}
+(def default-brew-values {:values {:grind "" :dose "17" :yield "" :duration ""}})
 
-   (number-field form {:id "dose"
-                       :name "dose"
-                       :label "Dose"
-                       :right-element "grams"})
+(defn- new-brew-form [{:keys [biff/db session]} form]
+  (let [all-beans (biff/q db '{:find [(pull ?beans [:xt/id :beans/name])]
+                               :where [[?user :xt/id ?uid]
+                                       [?beans :beans/user ?user]]
+                               :in [?uid]}
+                          (:uid session))]
+    (biff/form
+     {:class "space-y-4"
+      :hx-post "/brew"
+      :hx-swap "outerHTML"}
 
-   (number-field form {:id "yield"
-                       :name "yield"
-                       :label "Yield"
-                       :right-element "grams"})
+     (number-field form {:id "grind"
+                         :name "grind"
+                         :label "Grind"
+                         :right-element "grams"})
 
-   (number-field form {:id "duration"
-                       :name "duration"
-                       :label "Duration"
-                       :right-element "grams"})
+     (number-field form {:id "dose"
+                         :name "dose"
+                         :label "Dose"
+                         :right-element "grams"})
 
-   [:button.btn
-    {:type "submit"} "Save"]))
+     (number-field form {:id "yield"
+                         :name "yield"
+                         :label "Yield"
+                         :right-element "grams"})
+
+     (number-field form {:id "duration"
+                         :name "duration"
+                         :label "Duration"
+                         :right-element "grams"})
+
+     (select-field form {:id "beans"
+                         :name "beans"
+                         :label "Beans"
+                         :options (mapv (fn [[beans]]
+                                          (biff/pprint beans)
+                                          {:value (:xt/id beans) :label (:beans/name beans)})
+                                        all-beans)})
+
+     [:button.btn
+      {:type "submit"} "Save"])))
 
 (defn app [{:keys [user] :as req}]
   (ui/app-page
@@ -145,7 +177,7 @@
      [:h2.text-lg.font-bold "Brews"]
      [:a.inline-block.btn {:href "/brew/new"} "New brew"]]
     [:ul.space-y-2.m-0.p-0
-     (for [{:brew/keys [brewed-at dose yield duration] :xt/keys [id]} (reverse (sort-by :brew/brewed-at (:brew/_user user)))]
+     (for [{:brew/keys [brewed-at dose yield duration beans] :xt/keys [id]} (reverse (sort-by :brew/brewed-at (:brew/_user user)))]
        [:li.list-none.m-0.border.border-gray-300.rounded.shadow.p-4
         [:div.flex.justify-between
          [:div
@@ -166,7 +198,9 @@
             "1:" (/ yield dose)]]]
 
          [:div.flex.gap-2.items-center
-          [:span.text-sm.text-gray-500 (biff/format-date brewed-at "MMM d yyyy h:mm a")]
+          [:div.flex.flex-col
+           [:span.text-sm (:beans/name beans) " (" (:beans/roaster beans) ")"]
+           [:span.text-sm.text-gray-500 (biff/format-date brewed-at "MMM d yyyy h:mm a")]]
           [:button {:hx-delete (str "/brew/" id)
                     :hx-confirm "Are you sure?"} (icons/trash)]]]])]]))
 
@@ -183,14 +217,17 @@
 
 (def pos-required-double [:and [:double {:error/message "Required"}] [:> 0]])
 (def create-brew-params [:map
+                         [:grind pos-required-double]
                          [:dose pos-required-double]
                          [:yield pos-required-double]
-                         [:duration pos-required-double]])
+                         [:duration pos-required-double]
+                         [:beans :uuid]])
 
 (defn create-brew [{:keys [params session] :as req}]
   (let [parsed (m/decode create-brew-params params mt/string-transformer)]
     (if-not (m/validate create-brew-params parsed)
       (biff/render (new-brew-form
+                    req
                     {:values parsed
                      :errors (me/humanize (m/explain create-brew-params parsed))}))
       (do
@@ -198,9 +235,11 @@
                         [{:db/op :create
                           :db/doc-type :brew
                           :brew/brewed-at :db/now
+                          :brew/grind (:grind parsed)
                           :brew/yield (:yield parsed)
                           :brew/duration (:duration parsed)
                           :brew/dose (:dose parsed)
+                          :brew/beans (:beans parsed)
                           :brew/user (:uid session)}])
 
         {:status 201
@@ -231,7 +270,7 @@
   (ui/app-page
    req
    [:a.link {:href "/app"} "Back"]
-   (new-brew-form default-brew-values)))
+   (new-brew-form req default-brew-values)))
 
 (def features
   {:routes ["" {:middleware [mid/wrap-signed-in]}

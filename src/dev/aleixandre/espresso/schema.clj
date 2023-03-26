@@ -13,17 +13,33 @@
 
    :brew/id :uuid
    :brew/brewed-at inst?
+   :brew/grind :double
    :brew/yield :double
    :brew/dose :double
    :brew/duration :double
    :brew/user :user/id
+   :brew/beans :beans/id
    :brew [:map {:closed true}
           [:xt/id :brew/id]
           :brew/brewed-at
+          :brew/grind
           :brew/yield
           :brew/dose
           :brew/duration
-          :brew/user]})
+          :brew/user
+          :brew/beans]
+
+   :beans/id :uuid
+   :beans/name :string
+   :beans/roaster :string
+   :beans/roasted-on inst?
+   :beans/user :user/id
+   :beans [:map {:closed true}
+           [:xt/id :beans/id]
+           :beans/name
+           :beans/roaster
+           :beans/roasted-on
+           :beans/user]})
 
 (def features
   {:schema schema})

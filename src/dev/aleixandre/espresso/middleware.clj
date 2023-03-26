@@ -13,7 +13,10 @@
   (fn [{:keys [biff/db session] :as req}]
     (if (some? (:uid session))
       (let
-       [user (xt/pull db '[* {:brew/_user [*]}] (:uid session))]
+       [user (xt/pull
+              db
+              '[* {:brew/_user [* {:brew/beans [*]}]}]
+              (:uid session))]
         (handler (assoc req :user user)))
       {:status 303
        :headers {"location" "/signin?error=not-signed-in"}})))

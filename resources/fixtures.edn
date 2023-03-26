@@ -1,10 +1,20 @@
 ;; Biff transaction. See https://biffweb.com/docs/reference/transactions/
 [{:db/doc-type :user
   :xt/id :db.id/user-a
-  :user/email "a@example.com"
-  :user/foo "Some Value"
+  :user/email "adrian.aleixandre@example.com"
   :user/joined-at :db/now}
- {:db/doc-type :msg
-  :msg/user :db.id/user-a
-  :msg/text "hello there"
-  :msg/sent-at :db/now}]
+ {:db/doc-type :beans
+  :xt/id :db.id/beans-a
+  :beans/user :db.id/user-a
+  :beans/name "Ceremony"
+  :beans/roaster "Youngblood"
+  :beans/roasted-on #inst "2023-03-15T00:00:00Z"}
+ {:db/doc-type :brew
+  :xt/id :db.id/brew-a
+  :brew/brewed-at :db/now
+  :brew/grind 0.2
+  :brew/dose 17.0
+  :brew/yield 35.5
+  :brew/duration 25.0
+  :brew/user :db.id/user-a
+  :brew/beans :db.id/beans-a}]

@@ -13,10 +13,10 @@
 
    :brew/id :uuid
    :brew/brewed-at inst?
-   :brew/grind :double
-   :brew/yield :double
-   :brew/dose :double
-   :brew/duration :double
+   :brew/grind [:or :double nil?]
+   :brew/yield [:or :double nil?]
+   :brew/dose [:or :double nil?]
+   :brew/duration [:or :double nil?]
    :brew/user :user/id
    :brew/beans :beans/id
    :brew [:map {:closed true}

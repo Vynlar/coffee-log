@@ -188,6 +188,9 @@
 (defn- ui-date-time [datetime]
   [:span.invisible {:_ replace-contents-with-date} (biff/format-date datetime)])
 
+(defn- render-nullable [value suffix]
+  (if value (str value suffix) biff/emdash))
+
 (defn app [{:keys [user] :as req}]
   (ui/app-page
    req
@@ -211,17 +214,18 @@
           [:div.flex.gap-3
            [:div.flex.flex-col.items-center
             [:span.uppercase.text-xs.text-gray-500 "Recipe"]
-            [:div dose " in"]
+            [:div (render-nullable dose " in")]
             (icons/arrow-down)
-            [:div yield " out"]]
+            [:div (render-nullable yield " out")]]
 
            [:div.flex.flex-col.items-center
             [:span.uppercase.text-xs.text-gray-500 "Time"]
-            duration "s"]
+            (render-nullable duration "s")]
 
-           [:div.flex.flex-col.items-center
-            [:span.uppercase.text-xs.text-gray-500 "Ratio"]
-            "1:" (format "%.1f" (/ yield dose))]]]
+           (when (and yield dose)
+             [:div.flex.flex-col.items-center
+              [:span.uppercase.text-xs.text-gray-500 "Ratio"]
+              "1:" (format "%.1f" (/ yield dose))])]]
 
          [:div.flex.gap-2.items-center
           [:div.flex.flex-col
@@ -241,13 +245,20 @@
           :on-close (fn [ws status-code reason]
                       (swap! chat-clients disj ws))}})
 
-(def pos-required-double [:and [:double {:error/message "Required"}] [:> 0]])
+(def optional-positive-double [:or empty? [:and :double [:> 0]]])
 (def create-brew-params [:map
-                         [:grind pos-required-double]
-                         [:dose pos-required-double]
-                         [:yield pos-required-double]
-                         [:duration pos-required-double]
+                         [:grind optional-positive-double]
+                         [:dose optional-positive-double]
+                         [:yield optional-positive-double]
+                         [:duration optional-positive-double]
                          [:beans :uuid]])
+
+(defn- coerce-double [val]
+  (biff/pprint val)
+  (cond
+    (double? val) val
+    (empty? val) nil
+    (string? val) (double val)))
 
 (defn create-brew [{:keys [params session] :as req}]
   (let [parsed (m/decode create-brew-params params mt/string-transformer)]
@@ -261,10 +272,10 @@
                         [{:db/op :create
                           :db/doc-type :brew
                           :brew/brewed-at :db/now
-                          :brew/grind (:grind parsed)
-                          :brew/yield (:yield parsed)
-                          :brew/duration (:duration parsed)
-                          :brew/dose (:dose parsed)
+                          :brew/grind (coerce-double (:grind parsed))
+                          :brew/yield (coerce-double (:yield parsed))
+                          :brew/duration (coerce-double (:duration parsed))
+                          :brew/dose (coerce-double (:dose parsed))
                           :brew/beans (:beans parsed)
                           :brew/user (:uid session)}])
 

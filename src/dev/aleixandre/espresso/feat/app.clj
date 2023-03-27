@@ -196,6 +196,12 @@
     [:div.flex.justify-between
      [:h2.text-lg.font-bold "My Brews"]
      [:a.inline-block.btn {:href "/brew/new"} "New brew"]]
+
+    (when (empty? (:brew/_user user))
+      [:div.flex.flex-col.items-center.pt-12
+       [:span.font-bold "You have no brews yet"]
+       [:span.text-sm.text-gray-500 [:a.link {:href "/brew/new"} "Add a brew"] " to get started"]])
+
     [:ul.space-y-2.m-0.p-0
      (for [{:brew/keys [brewed-at dose yield duration beans] :xt/keys [id]} (reverse (sort-by :brew/brewed-at (:brew/_user user)))]
        [:li.list-none.m-0.border.border-gray-300.rounded.shadow.p-4
@@ -298,7 +304,14 @@
      [:div.flex.justify-between
       [:h2.text-lg.font-bold "My Beans"]
       [:a.inline-block.btn {:href "/beans/new"} "Add beans"]]
+
+     (when (empty? all-beans)
+       [:div.flex.flex-col.items-center.pt-12
+        [:span.font-bold "You have no beans yet"]
+        [:span.text-sm.text-gray-500 [:a.link {:href "/beans/new"} "Add beans"] " to get started"]])
+
      [:div#delete-response.text-red-500]
+
      [:ul.p-0.m-0.divide-y
       (for [[{:keys [xt/id beans/name beans/roaster beans/roasted-on]}] all-beans]
         [:li.flex.items-center.justify-between.max-w-sm.py-2

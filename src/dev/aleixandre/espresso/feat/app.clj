@@ -128,9 +128,9 @@
 
 (def default-brew-values {:values {:grind "" :dose "17" :yield "" :duration ""}})
 
-(defn- form-save-button []
+(defn- form-save-button [{:keys [back-link]}]
   [:div.flex.gap-3.items-center.justify-end
-   [:a.link {:href "/app"} "Cancel"]
+   [:a.link {:href back-link} "Cancel"]
    [:button.btn
     {:type "submit"} "Save"]])
 
@@ -175,7 +175,7 @@
                                           {:value (:xt/id beans) :label (str (:beans/name beans) " (" (:beans/roaster beans) ")")})
                                         all-beans)})
 
-     (form-save-button))))
+     (form-save-button {:back-link "/app"}))))
 
 (def ^:private replace-contents-with-date
   (str
@@ -345,7 +345,7 @@
                                 :label "Roasted on"
                                 :_ "on load make a Date then put it into my valueAsDate"})
 
-             (form-save-button)))
+             (form-save-button {:back-link "/beans"})))
 
 (defn new-beans-page [{:keys [biff/db session] :as req}]
   (ui/app-page

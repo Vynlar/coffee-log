@@ -1,5 +1,6 @@
 (ns dev.aleixandre.espresso.feat.app
   (:require [com.biffweb :as biff :refer [q]]
+            [clojure.instant :refer [read-instant-date]]
             [dev.aleixandre.espresso.middleware :as mid]
             [dev.aleixandre.espresso.ui :as ui]
             [dev.aleixandre.espresso.icons :as icons]
@@ -98,11 +99,12 @@
   (when error
     [:div.text-red-600.first-letter:capitalize (first error)]))
 
-(defn input-field [form {:keys [id name label right-element type]}]
+(defn input-field [form {:keys [id name label right-element type] :as props}]
   [:div.flex.flex-col.gap-2
    [:label.font-bold {:for id} label]
    [:div.flex.gap-4.items-center
     [:input.w-full {:id id
+                    :_ (:_ props)
                     :name name :type (or type "text")
                     :step "any"
                     :default-value (get-in form [:values (keyword name)])}]
@@ -284,9 +286,11 @@
       {:status 404})))
 
 (defn beans-page [{:keys [biff/db session] :as req}]
-  (let [all-beans (biff/q db '{:find [(pull ?beans [*])]
+  (let [all-beans (biff/q db '{:find [(pull ?beans [*]) ?roasted-on]
                                :where [[?user :xt/id ?uid]
-                                       [?beans :beans/user ?user]]
+                                       [?beans :beans/user ?user]
+                                       [?beans :beans/roasted-on ?roasted-on]]
+                               :order-by [[?roasted-on :desc]]
                                :in [?uid]}
                           (:uid session))]
     (ui/app-page
@@ -307,18 +311,26 @@
                    :hx-target "#delete-response"
                    :hx-confirm "Are you sure?"} (icons/trash)]])])))
 
-(def default-beans-values {:values {:name "" :roaster ""}})
+(def default-beans-values {:values {:name "" :roaster "" :roasted-on ""}})
 
 (defn- new-beans-form [req form]
+  (biff/pprint form)
   (biff/form {:class "space-y-4 max-w-sm"
               :hx-post "/beans"
               :hx-swap "outerHTML"}
              (input-field form {:id "name"
                                 :name "name"
                                 :label "Name"})
+
              (input-field form {:id "roaster"
                                 :name "roaster"
                                 :label "Roaster"})
+
+             (input-field form {:id "roasted-on"
+                                :type "date"
+                                :name "roasted-on"
+                                :label "Roasted on"
+                                :_ "on load make a Date then put it into my valueAsDate"})
 
              (form-save-button)))
 
@@ -341,15 +353,20 @@
         last-beans (when last-brew (:brew/beans last-brew))]
     (ui/app-page
      req
-
      [:h2.text-lg.font-bold "New Brew"]
      (new-brew-form req (-> default-brew-values
                             (assoc-in [:values :grind] (or last-grind ""))
                             (assoc-in [:values :beans] (or last-beans "")))))))
 
+(defn parse-date [date-string]
+  (try
+    (read-instant-date date-string)
+    (catch Exception _ nil)))
+
 (def create-beans-params [:map
                           [:name :string]
-                          [:roaster :string]])
+                          [:roaster :string]
+                          [:roasted-on :string]])
 
 (defn create-beans [{:keys [params session] :as req}]
   (let [parsed (m/decode create-beans-params params mt/string-transformer)]
@@ -364,7 +381,7 @@
                           :db/doc-type :beans
                           :beans/name (:name parsed)
                           :beans/roaster (:roaster parsed)
-                          :beans/roasted-on :db/now
+                          :beans/roasted-on (parse-date (:roasted-on parsed))
                           :beans/user (:uid session)}])
 
         {:status 201

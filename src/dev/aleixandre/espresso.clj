@@ -39,6 +39,7 @@
 
 (def malli-opts
   {:registry (malr/composite-registry
+
               malc/default-registry
               (apply biff/safe-merge
                      (keep :schema features)))})

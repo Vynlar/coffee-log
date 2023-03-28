@@ -32,7 +32,7 @@
 (defn page [opts & body]
   (base
    opts
-   [:.p-3.mx-auto.max-w-screen-sm.w-full
+   [:.px-3.py-8.mx-auto.max-w-screen-sm.w-full
     (when (bound? #'csrf/*anti-forgery-token*)
       {:hx-headers (cheshire/generate-string
                     {:x-csrf-token csrf/*anti-forgery-token*})})
@@ -55,8 +55,15 @@
          "Sign out"])
        "."]]
 
-     [:nav.space-x-3.mb-6
-      [:a.link {:href "/app" :class (when (= :brews-page current-nav-item) "font-bold")} "Brews"]
-      [:a.link {:href "/beans" :class (when (= :beans-page current-nav-item) "font-bold")} "Beans"]]
+     [:nav.flex.mb-6.border-b.border-gray-300.px-2
+      (for [{:keys [label route nav-item]}
+            [{:label "Brews" :route "/app" :nav-item :brews-page}
+             {:label "Beans" :route "/beans" :nav-item :beans-page}]]
+        [:a {:href route
+             :class ["block border border-b-0 font-bold py-2 px-4 -mb-[1px] text-blue-500"
+                     (if (= nav-item current-nav-item)
+                       "font-bold border-gray-300 bg-white rounded-t-lg"
+                       "border-white")]}
+         label])]
 
      body)))
